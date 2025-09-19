@@ -130,6 +130,25 @@ def main():
     default="generated_env_artifacts",
     help="Directory to store the generated lock files and python package.",
   )
+  parser.add_argument(
+      "--requirements-txt",
+      action="store_true",  # This makes it a boolean flag (True if present, False by default)
+      default=False,  # Default behavior is no requirements.txt
+      help="If set, produces a requirements.txt file in the output directory. "
+           "Rename with `--output-requirements-file`",
+  )
+  parser.add_argument(
+      "--no-pyproject-toml",
+      action="store_true",  # This makes it a boolean flag (True if present, False by default)
+      default=False,  # Default behavior is produce or update a pyproject.toml
+      help="If set, does not produce or update a pyproject.toml file.",
+  )
+  parser.add_argument(
+      "--output-requirements-file",
+      type=str,
+      default=None,
+      help="Defaults to output_dir/requirements.txt if not specified and `--requirements-txt` specified.",
+  )
 
   args = parser.parse_args()
 
@@ -214,6 +233,9 @@ def main():
       build_pypi_package=args.build_pypi_package,
       output_dir=args.output_dir,
       template_pyproject_toml=args.template_pyproject_toml,
+      requirements_txt=args.requirements_txt,
+      no_pyproject_toml=args.no_pyproject_toml,
+      output_requirements_file=args.output_requirements_file
     )
     # Core function
     host_env_seeder.seed_environment()

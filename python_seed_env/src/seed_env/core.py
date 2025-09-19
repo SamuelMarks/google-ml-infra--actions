@@ -60,6 +60,9 @@ class EnvironmentSeeder:
     build_pypi_package: bool,
     output_dir: str,
     template_pyproject_toml: str = None,
+    requirements_txt: None | str = None,
+    no_pyproject_toml: bool = False,
+    output_requirements_file: None | str = None,
   ):
     self.host_name = host_name
     self.host_source_type = host_source_type
@@ -74,6 +77,9 @@ class EnvironmentSeeder:
     self.hardware = hardware
     self.build_pypi_package = build_pypi_package
     self.output_dir = output_dir
+    self.requirements_txt = requirements_txt
+    self.no_pyproject_toml = no_pyproject_toml
+    self.output_requirements_file = output_requirements_file
 
     self._load_seed_config()
 
@@ -146,29 +152,30 @@ class EnvironmentSeeder:
     self.output_dir = os.path.abspath(self.output_dir)
 
     # Determine the template for pyproject.toml. The explicit CLI argument takes precedence.
-    template_path = self.template_pyproject_toml
-    if not template_path and os.path.isfile("./pyproject.toml"):
-      template_path = os.path.abspath("./pyproject.toml")
-      logging.info(
-        f"Found pyproject.toml in the current directory. Using it as a template: {template_path}"
-      )
-
-    # Pre-flight check: Ensure the output directory root is clean of a pyproject.toml, as we will generate one.
-    final_pyproject_path = os.path.join(self.output_dir, "pyproject.toml")
-    if os.path.isfile(final_pyproject_path):
-      # Check for the specific edge case where the output directory is the project root
-      # and the existing pyproject.toml is the one we are using as a template.
-      if template_path and os.path.samefile(template_path, final_pyproject_path):
-        raise FileExistsError(
-          f"The output directory ('{self.output_dir}') contains a 'pyproject.toml', which was found to be used as a template. "
-          "Running this would overwrite the original template file. Please use a different --output-dir; or move the"
-          "existing pyproject.toml to a different location and use the --template-pyproject-toml flag to specify its new location."
+    if not self.no_pyproject_toml:
+      template_path = self.template_pyproject_toml
+      if not template_path and os.path.isfile("./pyproject.toml"):
+        template_path = os.path.abspath("./pyproject.toml")
+        logging.info(
+          f"Found pyproject.toml in the current directory. Using it as a template: {template_path}"
         )
-      # General case: the output directory contains a pre-existing pyproject.toml.
-      raise FileExistsError(
-        f"A pyproject.toml file already exists in the output directory: {self.output_dir}. "
-        "Please provide a clean directory or remove the file to avoid accidentaly overwriting it."
-      )
+
+      # Pre-flight check: Ensure the output directory root is clean of a pyproject.toml, as we will generate one.
+      final_pyproject_path = os.path.join(self.output_dir, "pyproject.toml")
+      if os.path.isfile(final_pyproject_path):
+        # Check for the specific edge case where the output directory is the project root
+        # and the existing pyproject.toml is the one we are using as a template.
+        if template_path and os.path.samefile(template_path, final_pyproject_path):
+          raise FileExistsError(
+            f"The output directory ('{self.output_dir}') contains a 'pyproject.toml', which was found to be used as a template. "
+            "Running this would overwrite the original template file. Please use a different --output-dir; or move the"
+            "existing pyproject.toml to a different location and use the --template-pyproject-toml flag to specify its new location."
+          )
+        # General case: the output directory contains a pre-existing pyproject.toml.
+        raise FileExistsError(
+          f"A pyproject.toml file already exists in the output directory: {self.output_dir}. "
+          "Please provide a clean directory or remove the file to avoid accidentaly overwriting it."
+        )
 
     # Create a directory for storing the downloaded requirements file
     self.download_dir = "downloaded_base_and_seed_requirements"
@@ -222,10 +229,11 @@ class EnvironmentSeeder:
       )
 
       # 4. Generate a pyproject.toml file for the specified Python version.
-      logging.info(f"Generating minimal pyproject.toml for Python {python_version}")
-      generate_minimal_pyproject_toml(
-        self.host_name, python_version, versioned_output_dir
-      )
+      if not self.no_pyproject_toml:
+        logging.info(f"Generating minimal pyproject.toml for Python {python_version}")
+        generate_minimal_pyproject_toml(
+          self.host_name, python_version, versioned_output_dir
+        )
 
       # Construct the host lock file name
       HOST_LOCK_FILE_NAME = f"{self.host_name.replace('-', '_')}_requirements_lock_{python_version.replace('.', '_')}.txt"
@@ -240,9 +248,10 @@ class EnvironmentSeeder:
 
     # Combine the individual pyproject.toml files from each python_version subdirectory
     # into a single pyproject.toml file at the output dir.
-    merge_project_toml_files(
-      versioned_project_toml_files, self.output_dir, template_path
-    )
+    if not self.no_pyproject_toml:
+      merge_project_toml_files(
+        versioned_project_toml_files, self.output_dir, template_path
+      )
 
     # 6. Build pypi package
     # TODO(kanglant): Assume where the seed-env cli is called is the project root
